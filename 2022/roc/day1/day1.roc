@@ -15,14 +15,11 @@ main = Program.noArgs mainTask
 
 mainTask : Task ExitCode [] [Read [File], Write [Stderr, Stdout]]
 mainTask =
-    path = Path.fromStr "day1.txt"
+    path = Path.fromStr "part1.txt"
     task =
         contents <- File.readUtf8 path |> Task.await
         parsed = parseInput contents
-        maxNum =
-            List.map parsed sumNums
-            |> List.max
-            |> Result.withDefault 0
+        maxNum = top3 parsed
 
         Stdout.line (Num.toStr maxNum)
 
@@ -49,6 +46,21 @@ parseInput = \contents ->
         Str.split numLines "\n"
         |> List.map \num ->
             Str.toU64 num |> Result.withDefault 0
+
+# part1
+# calculateMax : List (List U64) -> U64
+# calculateMax = \list ->
+#     List.map list sumNums
+#     |> List.max
+#     |> Result.withDefault 0
+#
+# part 2
+top3 : List (List U64) -> U64
+top3 = \list ->
+    List.map list sumNums
+    |> List.sortDesc
+    |> List.takeFirst 3
+    |> List.walk 0 Num.add
 
 sumNums : List (Num a) -> Num a
 sumNums = \nums ->
