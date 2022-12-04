@@ -1,4 +1,4 @@
-app "day2"
+app "day3"
     packages { pf: "../../../../roc_nightly-macos_11_x86_64-2022-11-23-0ac6fe7/examples/cli/cli-platform/main.roc" }
     imports [
         pf.File,
@@ -21,11 +21,18 @@ mainTask =
     task =
         inputString <- inputPath |> File.readUtf8 |> Task.await
         sacks = parse inputString
+
         itemTypes <- sacks |> List.mapTry determineItemType |> Task.fromResult |> Task.await
         p1 = sumPriorities itemTypes
+        _ <- Stdout.line "Part1: \(p1)" |> Task.await
+
+        groups = groupSacks sacks
+        _ <- Stdout.line "groups" |> Task.await
+        badgeTypes <- groups |> List.mapTry determineBadge |> Task.fromResult |> Task.await
+        p2 = sumPriorities badgeTypes
 
         _ <- Stdout.line "Part1: \(p1)" |> Task.await
-        Stdout.line "Part2: todo"
+        Stdout.line "Part2: \(p2)"
 
     Task.attempt task \result ->
         when result is
@@ -35,12 +42,19 @@ mainTask =
                     FileReadErr _ _ -> Stderr.line "Error reading file"
                     FileReadUtf8Err _ _ -> Stderr.line "Error with path"
                     NotFound -> Stderr.line "No itemType found"
+                    InvalidGroupErr -> Stderr.line "Invalid group"
 
 parse : Str -> List Str
 parse = \str ->
     str
     |> Str.trim
     |> Str.split "\n"
+
+groupSacks : List Str -> List (List Str)
+groupSacks = \sacks ->
+    group = List.takeFirst sacks 3
+
+    List.concat [group] (groupSacks (List.drop sacks 3))
 
 determineItemType : Str -> Result Str [NotFound]
 determineItemType = \sack ->
@@ -49,7 +63,20 @@ determineItemType = \sack ->
     half = len // 2
     firstHalf = List.takeFirst items half
     secondHalf = List.drop items half
+
     List.findFirst firstHalf \elem -> List.contains secondHalf elem
+
+determineBadge : List Str -> Result Str [InvalidGroupErr]
+determineBadge = \group ->
+    when group is
+        [a, b, c] ->
+            aItems = Str.graphemes a
+            bItems = Str.graphemes b
+            cItems = Str.graphemes c
+
+            List.findFirst aItems \elem -> List.contains bItems elem && List.contains cItems elem
+
+        _ -> Err InvalidGroupErr
 
 sumPriorities : List Str -> Str
 sumPriorities = \itemTypes ->
