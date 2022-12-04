@@ -11,32 +11,27 @@ app "day1"
     provides [main] to pf
 
 main : Program
-main = Program.noArgs mainTask
+main = Program.quick mainTask
 
-mainTask : Task ExitCode [] [Read [File], Write [Stderr, Stdout]]
+mainTask : Task {} [] [Read [File], Write [Stderr, Stdout]]
 mainTask =
     path = Path.fromStr "part1.txt"
     task =
         contents <- File.readUtf8 path |> Task.await
         parsed = parseInput contents
+        max = calculateMax parsed
         maxNum = top3 parsed
 
-        Stdout.line (Num.toStr maxNum)
+        _ <- Stdout.line "Part1: \(max)" |> Task.await
+        Stdout.line "Part2: \(maxNum)"
 
     Task.attempt task \result ->
         when result is
-            Ok {} ->
-                Stdout.line "Success"
-                |> Program.exit 0
-
+            Ok {} -> Task.succeed {}
             Err err ->
-                msg =
-                    when err is
-                        FileReadErr _ _ -> "Error reading file"
-                        FileReadUtf8Err _ _ -> "Error with path"
-
-                Stderr.line msg
-                |> Program.exit 1
+                when err is
+                    FileReadErr _ _ -> Stderr.line "Error reading file"
+                    FileReadUtf8Err _ _ -> Stderr.line "Error with path"
 
 parseInput : Str -> List (List U64)
 parseInput = \contents ->
@@ -48,19 +43,21 @@ parseInput = \contents ->
             Str.toU64 num |> Result.withDefault 0
 
 # part1
-# calculateMax : List (List U64) -> U64
-# calculateMax = \list ->
-#     List.map list sumNums
-#     |> List.max
-#     |> Result.withDefault 0
-#
+calculateMax : List (List U64) -> Str
+calculateMax = \list ->
+    List.map list sumNums
+    |> List.max
+    |> Result.withDefault 0
+    |> Num.toStr
+
 # part 2
-top3 : List (List U64) -> U64
+top3 : List (List U64) -> Str
 top3 = \list ->
     List.map list sumNums
     |> List.sortDesc
     |> List.takeFirst 3
     |> List.walk 0 Num.add
+    |> Num.toStr
 
 sumNums : List (Num a) -> Num a
 sumNums = \nums ->
