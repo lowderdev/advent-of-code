@@ -24,10 +24,9 @@ mainTask =
 
         itemTypes <- sacks |> List.mapTry determineItemType |> Task.fromResult |> Task.await
         p1 = sumPriorities itemTypes
-        _ <- Stdout.line "Part1: \(p1)" |> Task.await
 
-        groups = groupSacks sacks
-        _ <- Stdout.line "groups" |> Task.await
+        groups = groupSacks sacks []
+
         badgeTypes <- groups |> List.mapTry determineBadge |> Task.fromResult |> Task.await
         p2 = sumPriorities badgeTypes
 
@@ -50,11 +49,11 @@ parse = \str ->
     |> Str.trim
     |> Str.split "\n"
 
-groupSacks : List Str -> List (List Str)
-groupSacks = \sacks ->
-    group = List.takeFirst sacks 3
-
-    List.concat [group] (groupSacks (List.drop sacks 3))
+groupSacks : List Str, List (List Str) -> List (List Str)
+groupSacks = \sacks, groups ->
+    when sacks is
+        [a, b, c, ..] -> groupSacks (List.drop sacks 3) (List.append groups [a, b, c])
+        _ -> groups
 
 determineItemType : Str -> Result Str [NotFound]
 determineItemType = \sack ->
@@ -142,3 +141,6 @@ scoreItem = \letter ->
         "Y" -> 51
         "Z" -> 52
         _ -> 0
+
+testLists = ["a", "b", "c", "d", "e", "f"]
+expect groupSacks testLists [] == [["a", "b", "c"], ["d", "e", "f"]]
