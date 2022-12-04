@@ -13,6 +13,9 @@ app "day2"
 Round : { left : Hand, right : Hand }
 Hand : [Rock, Paper, Scissors]
 
+RoundPlan : { op : Hand, outcome : Outcome }
+Outcome : [Lose, Draw, Win]
+
 inputPath : Path.Path
 inputPath = Path.fromStr "part1.txt"
 
@@ -23,11 +26,14 @@ mainTask : Task {} [] [Read [File], Write [Stderr, Stdout]]
 mainTask =
     task =
         inputString <- inputPath |> File.readUtf8 |> Task.await
-        rounds <- inputString |> parse |> Task.fromResult |> Task.await
-        p1 = calculateScore rounds
+        rounds <- inputString |> parsePart1 |> Task.fromResult |> Task.await
+        p1 = calculateRoundsScore rounds
+
+        roundPlans <- inputString |> parsePart2 |> Task.fromResult |> Task.await
+        p2 = calculateRoundPlansScore roundPlans
 
         _ <- Stdout.line "Part1: \(p1)" |> Task.await
-        Stdout.line "Part2: todo"
+        Stdout.line "Part2: \(p2)"
 
     Task.attempt task \result ->
         when result is
@@ -38,9 +44,11 @@ mainTask =
                     FileReadUtf8Err _ _ -> Stderr.line "Error with path"
                     InvalidRoundErr str -> Stderr.line "InvalidRoundErr: \(str)"
                     InvalidHandErr str -> Stderr.line "InvalidHandErr: \(str)"
+                    InvalidRoundPlanErr str -> Stderr.line "InvalidRoundPlanErr: \(str)"
+                    InvalidOutcomeErr str -> Stderr.line "InvalidOutcomeErr: \(str)"
 
-parse : Str -> Result (List Round) [InvalidRoundErr Str, InvalidHandErr Str]
-parse = \inputString ->
+parsePart1 : Str -> Result (List Round) [InvalidRoundErr Str, InvalidHandErr Str]
+parsePart1 = \inputString ->
     inputString
     |> Str.trim
     |> Str.split "\n"
@@ -64,8 +72,33 @@ parseHand = \hand ->
         "C" | "Z" -> Ok Scissors
         _ -> Err (InvalidHandErr hand)
 
-calculateScore : List Round -> Str
-calculateScore = \rounds ->
+parsePart2 : Str -> Result (List RoundPlan) [InvalidRoundPlanErr Str, InvalidOutcomeErr Str]
+parsePart2 = \inputString ->
+    inputString
+    |> Str.trim
+    |> Str.split "\n"
+    |> List.mapTry parseRoundPlan
+
+parseRoundPlan : Str -> Result RoundPlan [InvalidRoundPlanErr Str]
+parseRoundPlan = \plan ->
+    when Str.split plan " " is
+        [opponentHand, outcomePlan] ->
+            op <- opponentHand |> parseHand |> Result.try
+            outcome <- outcomePlan |> parseOutcome |> Result.try
+            Ok { op, outcome }
+
+        _ -> Err (InvalidRoundPlanErr plan)
+
+parseOutcome : Str -> Result Outcome [InvalidOutcomeErr Str]
+parseOutcome = \outcome ->
+    when outcome is
+        "X" -> Ok Lose
+        "Y" -> Ok Draw
+        "Z" -> Ok Win
+        _ -> Err (InvalidOutcomeErr outcome)
+
+calculateRoundsScore : List Round -> Str
+calculateRoundsScore = \rounds ->
     tally = \acc, round -> round |> calculateRound |> Num.add acc
 
     List.walk rounds 0 tally
@@ -85,3 +118,25 @@ calculateRound = \round ->
         { left: Rock, right: Scissors } -> 3 + 0
         { left: Paper, right: Scissors } -> 3 + 6
         { left: Scissors, right: Scissors } -> 3 + 3
+
+calculateRoundPlansScore : List RoundPlan -> Str
+calculateRoundPlansScore = \plans ->
+    tally = \acc, plan -> plan |> calculateRoundPlan |> Num.add acc
+
+    List.walk plans 0 tally
+    |> Num.toStr
+
+# "1 for Rock, 2 for Paper, and 3 for Scissors"
+# "0 if you lost, 3 if the round was a draw, and 6 if you won"
+calculateRoundPlan : RoundPlan -> Nat
+calculateRoundPlan = \plan ->
+    when plan is
+        { op: Rock, outcome: Lose } -> 3 + 0
+        { op: Paper, outcome: Lose } -> 1 + 0
+        { op: Scissors, outcome: Lose } -> 2 + 0
+        { op: Rock, outcome: Draw } -> 1 + 3
+        { op: Paper, outcome: Draw } -> 2 + 3
+        { op: Scissors, outcome: Draw } -> 3 + 3
+        { op: Rock, outcome: Win } -> 2 + 6
+        { op: Paper, outcome: Win } -> 3 + 6
+        { op: Scissors, outcome: Win } -> 1 + 6
