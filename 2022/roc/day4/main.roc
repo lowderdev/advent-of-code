@@ -29,7 +29,7 @@ main =
     Task.onFail task \err ->
         when err is
             FileReadErr _ _ -> Stderr.line "Error reading file"
-            FileReadUtf8Err _ _ -> Stderr.line "Error with path"
+            FileReadUtf8Err _ _ -> Stderr.line "Error reading file as utf8"
             InvalidFilename _ _ _ -> Stderr.line "Invalid file name"
             InvalidRangePair | InvalidRange | InvalidNumStr -> Stderr.line "Invalid input"
 
@@ -66,12 +66,10 @@ parseRange = \range ->
 
 countContainedRangePairs : List RangePair -> Nat
 countContainedRangePairs = \rangePairs ->
-    rangePairs
-    |> List.keepIf \{ a, b } -> rangeContainsRange a b
-    |> List.len
+    List.countIf rangePairs rangeContainsRange
 
-rangeContainsRange : Range, Range -> Bool
-rangeContainsRange = \a, b ->
+rangeContainsRange : RangePair -> Bool
+rangeContainsRange = \{ a, b } ->
     aContainsB = a.start <= b.start && a.end >= b.end
     bContainsA = b.start <= a.start && b.end >= a.end
 
@@ -79,12 +77,10 @@ rangeContainsRange = \a, b ->
 
 countOverlappingRangePairs : List RangePair -> Nat
 countOverlappingRangePairs = \rangePairs ->
-    rangePairs
-    |> List.keepIf \{ a, b } -> rangesOverlap a b
-    |> List.len
+    List.countIf rangePairs rangesOverlap
 
-rangesOverlap : Range, Range -> Bool
-rangesOverlap = \a, b ->
+rangesOverlap : RangePair -> Bool
+rangesOverlap = \{ a, b } ->
     aOverlapsB = a.start <= b.start && b.start <= a.end
     bOverlapsA = b.start <= a.start && a.start <= b.end
 
