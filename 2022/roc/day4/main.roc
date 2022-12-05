@@ -20,9 +20,11 @@ main =
     task =
         inputString <- inputPath |> File.readUtf8 |> Task.await
         rangePairs <- inputString |> parse |> Task.fromResult |> Task.await
-        fullyContainedRanges = rangePairs |> processRangePairs |> Num.toStr
+        containedRangeCount = rangePairs |> countContainedRangePairs |> Num.toStr
+        overlappingRangeCount = rangePairs |> countOverlappingRangePairs |> Num.toStr
 
-        Stdout.line "Part1: \(fullyContainedRanges)"
+        _ <- Stdout.line "Part1: \(containedRangeCount)" |> Task.await
+        Stdout.line "Part2: \(overlappingRangeCount)"
 
     Task.onFail task \err ->
         when err is
@@ -62,12 +64,28 @@ parseRange = \range ->
 
         _ -> Err InvalidRange
 
-processRangePairs : List RangePair -> Nat
-processRangePairs = \rangePairs ->
+countContainedRangePairs : List RangePair -> Nat
+countContainedRangePairs = \rangePairs ->
     rangePairs
-    |> List.keepIf \{ a, b } -> rangeContainsRange a b || rangeContainsRange b a
+    |> List.keepIf \{ a, b } -> rangeContainsRange a b
     |> List.len
 
 rangeContainsRange : Range, Range -> Bool
 rangeContainsRange = \a, b ->
-    a.start <= b.start && a.end >= b.end
+    aContainsB = a.start <= b.start && a.end >= b.end
+    bContainsA = b.start <= a.start && b.end >= a.end
+
+    aContainsB || bContainsA
+
+countOverlappingRangePairs : List RangePair -> Nat
+countOverlappingRangePairs = \rangePairs ->
+    rangePairs
+    |> List.keepIf \{ a, b } -> rangesOverlap a b
+    |> List.len
+
+rangesOverlap : Range, Range -> Bool
+rangesOverlap = \a, b ->
+    aOverlapsB = a.start <= b.start && b.start <= a.end
+    bOverlapsA = b.start <= a.start && a.start <= b.end
+
+    aOverlapsB || bOverlapsA
