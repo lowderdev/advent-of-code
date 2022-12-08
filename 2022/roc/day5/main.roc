@@ -40,25 +40,22 @@ startingCrates =
 #     Dict.single 1 ["A", "B"]
 #     |> Dict.insert 2 ["C"]
 #     |> Dict.insert 3 ["D"]
-
 main : Task {} []
 main =
     task =
         inputString <- inputPath |> File.readUtf8 |> Task.await
         # inputString = "move 1 from 3 to 1"
-
         moves <- parseMoves inputString |> Task.fromResult |> Task.await
-        st = List.walk moves "" \s, { count: count, from: from, to: to } ->
-            Str.joinWith [s, Num.toStr count, Num.toStr from, Num.toStr to] ""
-        _ <- Stdout.line "St: \(st)" |> Task.await
+        # st = List.walk moves "" \s, { count: count, from: from, to: to } ->
+        #     Str.joinWith [s, Num.toStr count, Num.toStr from, Num.toStr to] ""
+        # _ <- Stdout.line "St: \(st)" |> Task.await
         final <- applyMoves moves startingCrates |> Task.fromResult |> Task.await
-        dict = Dict.walk final "" \sd, k, v ->
-            Str.concat sd (List.walk v "" \sl, elem -> Str.concat sl elem)
-        _ <- Stdout.line "Dict: \(dict)" |> Task.await
+        # dict = Dict.walk final "" \sd, k, v ->
+        #     Str.concat sd (List.walk v "" \sl, elem -> Str.concat sl elem)
+        # _ <- Stdout.line "Dict: \(dict)" |> Task.await
         topCrates = getTopCrates final
 
-        _ <- Stdout.line "Part1: \(topCrates)" |> Task.await
-        Stdout.line "Part2: todo"
+        Stdout.line "Answer: \(topCrates)"
 
     Task.onFail task \err ->
         when err is
@@ -99,7 +96,9 @@ applyMove = \{ count: count, from: from, to: to }, crates ->
     fromCrates <- Dict.get crates from |> Result.try
     toCrates <- Dict.get crates to |> Result.try
     { before: toMove, others: newFrom } = List.split fromCrates (count)
-    newTo = List.concat (List.reverse toMove) toCrates
+    # Part1:
+    # newTo = List.concat (List.reverse toMove) toCrates
+    newTo = List.concat toMove toCrates
 
     crates
     |> Dict.insert from newFrom
@@ -114,7 +113,6 @@ getTopCrates = \crates ->
         when crate is
             Ok str -> Str.concat topCrates str
             Err ListWasEmpty -> topCrates
-
 
 # v = Dict.insert Dict.empty 1 "one"
 # v2 = Dict.get v 1
