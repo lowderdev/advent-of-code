@@ -51,7 +51,7 @@ parseRangePair = \pair ->
         [a, b] -> Ok { a, b }
         _ -> Err InvalidRangePair
 
-parseRange : Str -> Result Range [InvalidRange]
+parseRange : Str -> Result Range [InvalidRange, InvalidNumStr]
 parseRange = \range ->
     nums = range |> Str.split "-"
 
