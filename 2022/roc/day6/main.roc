@@ -32,20 +32,18 @@ findMsg = \input ->
     input
     |> Str.trim
     |> Str.graphemes
-    |> searchLetters 4
+    |> searchLetters 14
 
 searchLetters : List Str, Nat -> Result Nat [NoMsgFound]
 searchLetters = \letters, limit ->
-    { before } = List.split letters 4
+    { before } = List.split letters 14
+    if List.len before == 14 then
+        if allDifferent before then
+            Ok limit
+        else
+            searchLetters (List.dropFirst letters) (limit + 1)
 
-    when before is
-        [_, _, _, _] ->
-            if allDifferent before then
-                Ok limit
-            else
-                searchLetters (List.dropFirst letters) (limit + 1)
-
-        _ -> Err NoMsgFound
+    else Err NoMsgFound
 
 allDifferent : List Str -> Bool
 allDifferent = \letters ->
