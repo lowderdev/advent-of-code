@@ -9,9 +9,9 @@ app "day7"
     ]
     provides [main] to pf
 
-InputLine : [Cd Str, Ls, Back, DirLine Str, FileLine Nat]
+InputLine : [Cd Str, Ls, Back, DirLine Str, FileLine U64]
 DirState : { cwd : DirPath, dirs : DirListing }
-DirListing : Dict DirPath Nat
+DirListing : Dict DirPath U64
 DirPath : List Str
 
 inputPath : Path.Path
@@ -22,10 +22,17 @@ main =
     task =
         inputString <- inputPath |> File.readUtf8 |> Task.await
         inputLines <- parse inputString |> Task.fromResult |> Task.await
-        dirSizesNum = sizeDirectories inputLines
-        dirSizes = Num.toStr dirSizesNum
+        dirs = sizeDirectories inputLines
+        smallDirSizes = dirs |> sizeSmallDirectories |> Num.toStr
 
-        Stdout.line "Answer: \(dirSizes)"
+        # had to add a starting string or it didn't work
+        totalDiskUsed <- Dict.get dirs ["/", "__ROOT__"] |> Task.fromResult |> Task.await
+        freeSpace <- Num.subChecked 70000000 totalDiskUsed |> Task.fromResult |> Task.await
+        spaceNeeded <- Num.subChecked 30000000 freeSpace |> Task.fromResult |> Task.await
+        deleteDirSizes = findDirToDelete dirs spaceNeeded
+        deleteDirSize = deleteDirSizes |> List.min |> Result.withDefault 0 |> Num.toStr
+
+        Stdout.line "Answer: \(smallDirSizes), deleteDirSize: \(deleteDirSize)"
 
     Task.onFail task \err ->
         when err is
@@ -33,6 +40,8 @@ main =
             FileReadUtf8Err _ _ -> Stderr.line "Error reading file as utf8"
             InvalidInputLine -> Stderr.line "Error: InvalidInputLine"
             InvalidNumStr -> Stderr.line "Error: InvalidNumStr"
+            Overflow -> Stderr.line "Error: Overflow"
+            KeyNotFound -> Stderr.line "Error: KeyNotFound"
 
 parse : Str -> Result (List InputLine) [InvalidInputLine, InvalidNumStr]
 parse = \lines ->
@@ -51,22 +60,10 @@ parseInputLine = \line ->
         ["$", "ls"] -> Ok Ls
         ["dir", dirName] -> Ok (DirLine dirName)
         [sizeStr, _] ->
-            size <- Str.toNat sizeStr |> Result.try
+            size <- Str.toU64 sizeStr |> Result.try
             Ok (FileLine size)
 
         _ -> Err InvalidInputLine
-
-sizeDirectories : List InputLine -> Nat
-sizeDirectories = \inputLines ->
-    dirState = { cwd: [], dirs: Dict.empty }
-    finalState = List.walk inputLines dirState traverseLines
-    finalSize = Dict.walk finalState.dirs 0 \s, _, v ->
-        if v < 100000 then
-            s + v
-        else
-            s
-
-    finalSize
 
 traverseLines : DirState, InputLine -> DirState
 traverseLines = \dirState, inputLine ->
@@ -84,7 +81,7 @@ traverseLines = \dirState, inputLine ->
 
 # Based on code from Luke!
 # https://github.com/lukewilliamboswell/roc-things/blob/4e31df0f88e792e2e955dcb58c58605b5bfbb358/aoc-2022/day7.roc
-updateParentDirs : DirListing, DirPath, Nat -> DirListing
+updateParentDirs : DirListing, DirPath, U64 -> DirListing
 updateParentDirs = \dirs, cwd, fileSize ->
     updatedDirs = Dict.update dirs cwd \possibleValue ->
         when possibleValue is
@@ -95,12 +92,22 @@ updateParentDirs = \dirs, cwd, fileSize ->
         [] -> dirs
         parentDir -> updateParentDirs updatedDirs parentDir fileSize
 
-alterValue : [Present Bool, Missing] -> [Present Bool, Missing]
-alterValue = \possibleValue ->
-    when possibleValue is
-        Missing -> Present Bool.false
-        Present value -> if value then Missing else Present Bool.true
+sizeDirectories : List InputLine -> DirListing
+sizeDirectories = \inputLines ->
+    dirState = { cwd: ["__ROOT__"], dirs: Dict.empty }
+    finalState = List.walk inputLines dirState traverseLines
 
-expect Dict.update Dict.empty "a" alterValue == Dict.single "a" Bool.false
-expect Dict.update (Dict.single "a" Bool.false) "a" alterValue == Dict.single "a" Bool.true
-expect Dict.update (Dict.single "a" Bool.true) "a" alterValue == Dict.empty
+    finalState.dirs
+
+sizeSmallDirectories : DirListing -> U64
+sizeSmallDirectories = \dirs ->
+    Dict.walk dirs 0 \totalSize, _, dirSize ->
+        if dirSize < 100000 then totalSize + dirSize else totalSize
+
+findDirToDelete : DirListing, U64 -> List U64
+findDirToDelete = \dirs, spaceNeeded ->
+    Dict.walk dirs [] \sizes, _, dirSize ->
+        if dirSize >= spaceNeeded then
+            List.append sizes dirSize
+        else
+            sizes
